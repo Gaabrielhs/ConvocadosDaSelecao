@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ConvocadosDaSelecao</string>
+    <string name="button_create_team">Sortear times!</string>
+    <string name="jogadores_tela">Jogadores</string>
+    <string name="times_tela">Times</string>
+    <string name="times_vazio_mensagem">Não há times sorteados.</string>
+</resources>
