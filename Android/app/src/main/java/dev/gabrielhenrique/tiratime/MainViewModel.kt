@@ -1,6 +1,7 @@
 package dev.gabrielhenrique.tiratime
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.AnnotatedString
@@ -16,7 +17,8 @@ class MainViewModel : ViewModel() {
 
     val jogadoresPorTime = 5
 
-    var jogadores by mutableStateOf(listOf<Jogador>())
+//    var jogadores by mutableStateOf(listOf<Jogador>())
+    var jogadores = mutableStateListOf<Jogador>()
 
     val mostrarCopiarDoClipboard = MutableStateFlow(false)
 
@@ -26,13 +28,11 @@ class MainViewModel : ViewModel() {
 
     fun adicionarJogador(jogador: Jogador) {
         if (jogador.nome.isBlank()) return
-        jogadores = jogadores.toMutableList().apply { add(jogador) }
+        jogadores.add(jogador)
     }
 
     fun removerJogador(name: String) {
-        val listaDeJogadores = jogadores.toMutableList()
-        listaDeJogadores.removeIf { it.nome == name }
-        jogadores = listaDeJogadores
+        jogadores.removeIf { it.nome == name }
     }
 
     fun sortearTimes() {
@@ -73,14 +73,14 @@ class MainViewModel : ViewModel() {
         jogadoresDeletados = jogadores
         timesDeletados = times
 
-        jogadores = listOf()
+        jogadores.clear()
         times = listOf()
 
         mostrarMensagemDelete = true
     }
 
     fun desfazerDelete() {
-        jogadores = jogadoresDeletados
+        jogadores.addAll(jogadoresDeletados)
         times = timesDeletados
     }
 
