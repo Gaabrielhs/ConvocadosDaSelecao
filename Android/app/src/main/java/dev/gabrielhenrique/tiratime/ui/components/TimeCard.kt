@@ -1,33 +1,41 @@
-package dev.gabrielhenrique.tiratime
+package dev.gabrielhenrique.tiratime.ui.components
 
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Card
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.material.contentColorFor
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.gabrielhenrique.tiratime.data.Jogador
 import dev.gabrielhenrique.tiratime.data.Time
-import dev.gabrielhenrique.tiratime.ui.components.JogadorCelula
 import dev.gabrielhenrique.tiratime.ui.theme.ConvocadosDaSelecaoTheme
 
 @Composable
 fun TimeCard(modifier: Modifier = Modifier, time: Time) {
+    val jogadores = remember(time) { time.jogadores.sortedByDescending { it.ehGoleiro } }
     Card(
         modifier = modifier,
-        elevation = 4.dp,
-        shape = RoundedCornerShape(8.dp)
+        elevation = CardDefaults.cardElevation(),
+        shape = CardDefaults.elevatedShape
     ) {
-        Column {
+        Column(
+            modifier = Modifier.padding(bottom = 4.dp),
+        ) {
             Row(
-                modifier = Modifier.background(MaterialTheme.colors.primary)
+                modifier = Modifier.background(MaterialTheme.colorScheme.primary)
             ) {
                 Text(
                     modifier = Modifier
@@ -35,12 +43,12 @@ fun TimeCard(modifier: Modifier = Modifier, time: Time) {
                         .fillMaxWidth(),
                     text = time.nome,
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.h6,
-                    color = MaterialTheme.colors.contentColorFor(MaterialTheme.colors.primary)
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.contentColorFor(MaterialTheme.colorScheme.primary)
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
-            time.jogadores.sortedByDescending { it.ehGoleiro }.forEach {
+            jogadores.forEach {
                 Row(
                     modifier = Modifier.padding(4.dp)
                 ) {

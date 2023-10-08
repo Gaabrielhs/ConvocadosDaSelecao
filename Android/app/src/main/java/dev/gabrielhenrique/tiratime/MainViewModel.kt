@@ -6,28 +6,52 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
+import com.google.firebase.remoteconfig.ktx.remoteConfig
+import com.google.firebase.remoteconfig.ktx.remoteConfigSettings
 import dev.gabrielhenrique.tiratime.data.Jogador
 import dev.gabrielhenrique.tiratime.data.Time
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlin.math.ceil
+import dev.gabrielhenrique.tiratime.domain.CarregarListaClipboardUseCase
+import dev.gabrielhenrique.tiratime.domain.SortearTimesUseCase
+import dev.gabrielhenrique.tiratime.domain.ValidarClipboardUseCase
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 
-val regex = Regex("""^[0-9]+[ ]*[-]+[ ]+(.*)$""", setOf(RegexOption.MULTILINE))
+
+const val REGEX_PATTERN_COLUMN_CHILD = "regexPattern"
 
 class MainViewModel : ViewModel() {
+    private val remoteConfig = Firebase.remoteConfig
 
-    val jogadoresPorTime = 5
+    private val sortearTimesUseCase by lazy { SortearTimesUseCase() }
+    private val validarClipboardUseCase by lazy { ValidarClipboardUseCase() }
+    private val carregarListaClipboardUseCase by lazy { CarregarListaClipboardUseCase() }
 
-//    var jogadores by mutableStateOf(listOf<Jogador>())
-    var jogadores = mutableStateListOf<Jogador>()
+    private var regexPattern: String? = null
+    private var jogadoresDeletados: List<Jogador> = listOf()
+    private var timesDeletados: List<Time> = listOf()
 
-    val mostrarCopiarDoClipboard = MutableStateFlow(false)
-
-    var times by mutableStateOf(listOf<Time>())
-
+    val jogadores = mutableStateListOf<Jogador>()
+    val times = mutableStateListOf<Time>()
     var nomeJogador by mutableStateOf("")
+
+    private val _mostrarCopiarDoClipboard = MutableSharedFlow<Unit>()
+    val mostrarCopiarDoClipboard = _mostrarCopiarDoClipboard.asSharedFlow()
+
+    private val _playDiceSound = MutableSharedFlow<Unit>()
+    val playDiceSound = _playDiceSound.asSharedFlow()
+
+    init {
+        regexPattern = remoteConfig.getString(REGEX_PATTERN_COLUMN_CHILD)
+    }
 
     fun adicionarJogador(jogador: Jogador) {
         if (jogador.nome.isBlank()) return
+        //Prevent for add duplicated
+        if(jogadores.any { it.nome == jogador.nome }) return
         jogadores.add(jogador)
     }
 
@@ -36,78 +60,48 @@ class MainViewModel : ViewModel() {
     }
 
     fun sortearTimes() {
-        val jogadoresParaSorteio = jogadores.filter { !it.ehGoleiro }.toMutableList()
-        val goleirosDisponiveisParaSorteio = jogadores.filter { it.ehGoleiro }.toMutableList()
-        val totalTimes = ceil(jogadoresParaSorteio.size / jogadoresPorTime.toFloat()).toInt()
-        val times = (0 until totalTimes).map {
-            val quantidadeMaximaDeJogadores =
-                jogadoresParaSorteio.size.coerceAtMost(jogadoresPorTime)
-            val jogadores = (0 until quantidadeMaximaDeJogadores).map {
-                val jogadorSorteado = jogadoresParaSorteio.random()
-                jogadoresParaSorteio.remove(jogadorSorteado)
-                jogadorSorteado
-            }.toMutableList()
+        val timesSorteados = sortearTimesUseCase(jogadores = jogadores)
+        println("time anterior: $times")
+        println("novo time: $timesSorteados")
+        times.clear()
+        times.addAll(timesSorteados)
 
-            //TODO Adicionar goleiro
-            val goleiro = goleirosDisponiveisParaSorteio.randomOrNull()
-            goleiro?.let {
-                goleirosDisponiveisParaSorteio.remove(it)
-                jogadores.add(it)
-            }
-
-            Time(
-                nome = if (jogadores.size >= jogadoresPorTime) "Time ${it + 1}" else "Reservas",
-                jogadores = jogadores,
-            )
+        viewModelScope.launch {
+            _playDiceSound.emit(Unit)
         }
-
-        this.times = times
     }
 
-    private var jogadoresDeletados: List<Jogador> = listOf()
-    private var timesDeletados: List<Time> = listOf()
-
-    var mostrarMensagemDelete by mutableStateOf(false)
-
     fun deletarTudo() {
-        jogadoresDeletados = jogadores
-        timesDeletados = times
+        jogadoresDeletados = jogadores.toList()
+        timesDeletados = times.toList()
 
         jogadores.clear()
-        times = listOf()
-
-        mostrarMensagemDelete = true
+        times.clear()
     }
 
     fun desfazerDelete() {
         jogadores.addAll(jogadoresDeletados)
-        times = timesDeletados
+        times.addAll(timesDeletados)
     }
 
     fun carregarListaDoClipboard(clipboard: AnnotatedString?) {
-        val textoCopiado = clipboard.toString()
-        val textoDivididoPorGoleirosEJogadores = textoCopiado.split("Jogadores")
-        val goleiros = textoDivididoPorGoleirosEJogadores.first()
-        val jogadores = textoDivididoPorGoleirosEJogadores.last()
-
-        val nomesGoleiros = regex.findAll(goleiros).map { it.groupValues[1] }
-        val nomesJogadores = regex.findAll(jogadores).map { it.groupValues[1] }
-
-        nomesGoleiros.forEach {
-            adicionarJogador(
-                Jogador(nome = it, ehGoleiro = true)
-            )
-        }
-
-        nomesJogadores.forEach {
-            adicionarJogador(
-                Jogador(nome = it)
-            )
+        carregarListaClipboardUseCase(regexPattern = regexPattern, clipboard = clipboard)?.let {
+            jogadores.clear()
+            jogadores.addAll(it)
         }
     }
 
     fun validarClipboard(text: AnnotatedString?): Boolean {
-        val clipboard = text.toString()
-        return regex.containsMatchIn(clipboard)
+        return validarClipboardUseCase(regexPattern = regexPattern, clipboard = text)
+    }
+
+    fun showSnackbar(hasFocus: Boolean) {
+        if (!hasFocus) {
+            return
+        }
+        println("showSnackbar | $regexPattern")
+        regexPattern?.let {
+            viewModelScope.launch { _mostrarCopiarDoClipboard.emit(Unit) }
+        }
     }
 }
