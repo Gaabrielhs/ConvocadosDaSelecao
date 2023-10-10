@@ -53,6 +53,9 @@ class MainViewModel : ViewModel() {
         //Prevent for add duplicated
         if(jogadores.any { it.nome == jogador.nome }) return
         jogadores.add(jogador)
+
+        // TODO: Extract the logic to a use case
+        // TODO: Persists the players in a local database
     }
 
     fun removerJogador(name: String) {
